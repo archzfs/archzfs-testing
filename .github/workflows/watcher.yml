@@ -12,7 +12,7 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get install -y jq curl
 
-      - name: Check Versions
+      - name: Check For Unreleased Linux Kernel
         id: check
         run: |
           # 1. Get Upstream Arch Linux Kernel Version
@@ -22,19 +22,17 @@ jobs:
           echo "Found Upstream Arch Kernel: $UPSTREAM_VER"
 
           # 2. Get List of ALL Kernels currently built in the repo
-          REPO_JSON=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/latest")
-          BUILT_VERSIONS=$(echo "$REPO_JSON" | jq -r '
-          .assets[]?
-          | select(.name | test("^zfs-linux-[0-9].*\\.pkg\\.tar\\.zst$")) 
-          | .name 
-          | capture("^zfs-linux-[^_]+_(?<kver>.*)-[^-]+-[^-]+\\.pkg").kver
-          ')
+          BUILT_VERSION=$(gh release view --repo ${{ github.repository }} --json assets --jq '
+            .assets[]?
+            | select(.name | test("^zfs-linux-[0-9].*\\.pkg\\.tar\\.zst$")) 
+            | .name 
+            | capture("^zfs-linux-[^_]+_(?<kver>.*)-[^-]+-[^-]+\\.pkg").kver
+            ' || true)
           
-          echo "Existing Builds found:"
-          echo "$BUILT_VERSIONS"
+          echo "Existing Build found: $BUILT_VERSION"
 
-          # 3. Is UPSTREAM_VER in the BUILT_VERSIONS list
-          if echo "$BUILT_VERSIONS" | grep -F -q "$UPSTREAM_VER"; then
+          # 3. Is UPSTREAM_VER the BUILT_VERSION
+          if echo "$BUILT_VERSION" | grep -F -q "$UPSTREAM_VER"; then
             echo "Version $UPSTREAM_VER already exists. No build needed."
             echo "trigger=false" >> $GITHUB_OUTPUT
           else
