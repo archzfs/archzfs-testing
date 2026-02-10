@@ -19,7 +19,7 @@ jobs:
         run: |
           # 1. Get Upstream Arch Linux Kernel Version
           ARCH_JSON=$(curl -s "https://archlinux.org/packages/core/x86_64/linux/json/")
-          UPSTREAM_VERSION=$(echo "$ARCH_JSON" | jq -r '.pkgver' + "." + ".pkgrel")
+          UPSTREAM_VERSION=$(echo "$ARCH_JSON" | jq -r '.pkgver + "." + .pkgrel')
           
           echo "Found Upstream Arch Kernel: $UPSTREAM_VERSION"
 
