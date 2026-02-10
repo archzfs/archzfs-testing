@@ -19,9 +19,9 @@ jobs:
         run: |
           # 1. Get Upstream Arch Linux Kernel Version
           ARCH_JSON=$(curl -s "https://archlinux.org/packages/core/x86_64/linux/json/")
-          UPSTREAM_VER=$(echo "$ARCH_JSON" | jq -r '.pkgver')
+          UPSTREAM_VERSION=$(echo "$ARCH_JSON" | jq -r '.pkgver')
           
-          echo "Found Upstream Arch Kernel: $UPSTREAM_VER"
+          echo "Found Upstream Arch Kernel: $UPSTREAM_VERSION"
 
           # 2. Get List of ALL Kernels currently built in the repo
           BUILT_VERSION=$(gh release view --repo ${{ github.repository }} --json assets --jq '
@@ -33,14 +33,14 @@ jobs:
           
           echo "Existing Build found: $BUILT_VERSION"
 
-          # 3. Is UPSTREAM_VER the BUILT_VERSION
-          if echo "$BUILT_VERSION" | grep -F -q "$UPSTREAM_VER"; then
-            echo "Version $UPSTREAM_VER already exists. No build needed."
+          # 3. Is UPSTREAM_VERSION the BUILT_VERSION
+          if echo "$BUILT_VERSION" | grep -F -q "$UPSTREAM_VERSION"; then
+            echo "Version $UPSTREAM_VERSION already exists. No build needed."
             echo "trigger=false" >> $GITHUB_OUTPUT
           else
-            echo "New kernel detected ($UPSTREAM_VER). Triggering build..."
+            echo "New kernel detected ($UPSTREAM_VERSION). Triggering build..."
             echo "trigger=true" >> $GITHUB_OUTPUT
-            echo "kernel_version=$UPSTREAM_VER" >> $GITHUB_OUTPUT
+            echo "kernel_version=$UPSTREAM_VERSION" >> $GITHUB_OUTPUT
           fi
 
       - name: Trigger Release Workflow
