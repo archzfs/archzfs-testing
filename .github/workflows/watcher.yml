@@ -14,6 +14,8 @@ jobs:
 
       - name: Check For Unreleased Linux Kernel
         id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           # 1. Get Upstream Arch Linux Kernel Version
           ARCH_JSON=$(curl -s "https://archlinux.org/packages/core/x86_64/linux/json/")
