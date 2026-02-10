@@ -1,0 +1,55 @@
+name: Watch for Arch Kernel Updates
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'  # Runs every 30 minutes
+  workflow_dispatch:
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install dependencies
+        run: sudo apt-get install -y jq curl
+
+      - name: Check Versions
+        id: check
+        run: |
+          # 1. Get Upstream Arch Linux Kernel Version
+          ARCH_JSON=$(curl -s "https://archlinux.org/packages/core/x86_64/linux/json/")
+          UPSTREAM_VER=$(echo "$ARCH_JSON" | jq -r '.pkgver')
+          
+          echo "Found Upstream Arch Kernel: $UPSTREAM_VER"
+
+          # 2. Get List of ALL Kernels currently built in the repo
+          REPO_JSON=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/latest")
+          BUILT_VERSIONS=$(echo "$REPO_JSON" | jq -r '
+          .assets[]?
+          | select(.name | test("^zfs-linux-[0-9].*\\.pkg\\.tar\\.zst$")) 
+          | .name 
+          | capture("^zfs-linux-[^_]+_(?<kver>.*)-[^-]+-[^-]+\\.pkg").kver
+          ')
+          
+          echo "Existing Builds found:"
+          echo "$BUILT_VERSIONS"
+
+          # 3. Is UPSTREAM_VER in the BUILT_VERSIONS list
+          if echo "$BUILT_VERSIONS" | grep -F -q "$UPSTREAM_VER"; then
+            echo "Version $UPSTREAM_VER already exists. No build needed."
+            echo "trigger=false" >> $GITHUB_OUTPUT
+          else
+            echo "New kernel detected ($UPSTREAM_VER). Triggering build..."
+            echo "trigger=true" >> $GITHUB_OUTPUT
+            echo "kernel_version=$UPSTREAM_VER" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Trigger Release Workflow
+        if: steps.check.outputs.trigger == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.BOT_PAT }}
+        run: |
+          gh workflow run release.yml \
+            --repo ${{ github.repository }} \
+            --ref master \
+            -f kernel_version="${{ steps.check.outputs.kernel_version }}"
+          

@@ -1,4 +1,10 @@
 on:
+  workflow_dispatch:
+    inputs:
+      kernel_version:
+        required: false
+    types: [arch-kernel-update]
+
   push:
     branches: [master]
     paths:
@@ -10,6 +16,7 @@ on:
     - cron: "4 2 * * *"
 
 name: Release
+run-name: Release ${{ inputs.kernel_version || 'Manual/Cron' }}
 
 concurrency:
   group: release
