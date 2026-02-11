@@ -1,6 +1,10 @@
 name: Watch for Arch Kernel Updates
 
 on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/watcher.yml'
   schedule:
     - cron: '10 * * * *'  # Runs every hour at 10 past the hour.
   workflow_dispatch:
