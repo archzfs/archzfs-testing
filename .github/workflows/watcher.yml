@@ -2,16 +2,13 @@ name: Watch for Arch Kernel Updates
 
 on:
   schedule:
-    - cron: '*/30 * * * *'  # Runs every 30 minutes
+    - cron: '10 * * * *'  # Runs every hour at 10 past the hour.
   workflow_dispatch:
 
 jobs:
   check-version:
     runs-on: ubuntu-latest
     steps:
-      - name: Install dependencies
-        run: sudo apt-get install -y jq curl
-
       - name: Check For Unreleased Linux Kernel
         id: check
         env:
@@ -24,6 +21,7 @@ jobs:
           echo "Found Upstream Arch Kernel: $UPSTREAM_VERSION"
 
           # 2. Get kernel version currently built in the repo
+          # `|| true` is included to handle no releases gracefully (e.g. forks)
           BUILT_VERSION=$(gh release view --repo ${{ github.repository }} --json assets --jq '
             .assets[]?
             | select(.name | test("^zfs-linux-[0-9].*\\.pkg\\.tar\\.zst$")) 
@@ -34,7 +32,7 @@ jobs:
           echo "Existing Build found: $BUILT_VERSION"
 
           # 3. Is UPSTREAM_VERSION the BUILT_VERSION
-          if echo "$BUILT_VERSION" | grep -Fxq "$UPSTREAM_VERSION"; then
+          if [[ "$BUILT_VERSION" == "$UPSTREAM_VERSION" ]]; then
             echo "Version $UPSTREAM_VERSION already exists. No build needed."
             echo "trigger=false" >> $GITHUB_OUTPUT
           else
