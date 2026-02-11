@@ -10,6 +10,7 @@ on:
     paths:
       - '**.sh'
       - '.github/workflows/**'
+      - '!.github/workflows/watcher.yml'
       - 'build-container/**'
       - 'packages/**'
   schedule:
