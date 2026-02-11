@@ -48,7 +48,7 @@ jobs:
       - name: Trigger Release Workflow
         if: steps.check.outputs.trigger == 'true'
         env:
-          GH_TOKEN: ${{ secrets.BOT_PAT }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           gh workflow run release.yml \
             --repo ${{ github.repository }} \
