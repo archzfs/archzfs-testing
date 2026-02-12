@@ -42,8 +42,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6.0.2
 
+      - name: Read Mirror URL
+        id: get_mirror
+        run: |
+          MIRROR=$(cat mirror.txt | tr -d '\n')
+          echo "MIRROR_URL=$MIRROR" >> $GITHUB_ENV
+
       - name: Build builder container
-        run: docker build -t archzfs-builder build-container
+        run: |
+          docker build \
+          --build-arg MIRROR_URL=${{ env.MIRROR_URL }} \
+          -t archzfs-builder build-container
 
       - name: Run builder container
         env:
