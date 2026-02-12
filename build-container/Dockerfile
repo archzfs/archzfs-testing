@@ -2,6 +2,7 @@ FROM archlinux:base-devel
 
 # Set up the mirror from mirror-url
 ARG MIRROR_URL
+ENV MIRROR_URL=$MIRROR_URL
 
 USER root
 RUN echo "Server = ${MIRROR_URL}/archlinux/\$repo/os/\$arch" > /etc/pacman.d/mirrorlist
