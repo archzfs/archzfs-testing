@@ -42,7 +42,7 @@ fi
 
 if [ ! -z "${MIRROR_URL}" ]; then
     echo "==> Forcing system mirror to: ${MIRROR_URL}"
-    echo "Server = ${MIRROR_URL}" | sudo tee /etc/pacman.d/mirrorlist
+    echo "Server = ${MIRROR_URL}/archlinux/\$repo/os/\$arch" | sudo tee /etc/pacman.d/mirrorlist
 else
     echo "!! WARNING: MIRROR_URL was not set. Using default mirrors."
 fi
