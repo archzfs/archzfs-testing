@@ -4,9 +4,10 @@ FROM archlinux:base-devel
 ARG MIRROR_URL
 
 USER root
-RUN echo "Using mirror ${MIRROR_URL}"
 RUN echo "Server = ${MIRROR_URL}/archlinux/\$repo/os/\$arch" > /etc/pacman.d/mirrorlist
 
+# Confirm the mirror is set.
+RUN pacman -Sp python-pipx python-twisted git wget systemd-sysvcompat openresolv vi
 # The following is adapted from https://github.com/archzfs/archzfs-ci/blob/master/worker/Dockerfile
 RUN pacman -Syu --noconfirm --needed python-pipx python-twisted git wget systemd-sysvcompat openresolv vi
 
