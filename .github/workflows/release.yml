@@ -45,7 +45,7 @@ jobs:
       - name: Read Mirror URL
         id: get_mirror
         run: |
-          MIRROR=$(cat mirrror-url | tr -d '\n')
+          MIRROR=$(cat mirror-url | tr -d '\n')
           echo "MIRROR_URL=$MIRROR" >> $GITHUB_ENV
 
       - name: Build builder container
