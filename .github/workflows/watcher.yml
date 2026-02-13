@@ -39,26 +39,25 @@ jobs:
           get_kernel_version() {
             local db=$1
             local kernel=$2
-            local entry=$(tar -tzf "$db" 2>/dev/null | grep "^${kernel}-[0-9]" | head -n1)
+            local entry=$(tar -tzf "$db" 2>/dev/null | grep "^${kernel}-[0-9].*/$" | head -n1)
             if [[ -n "$entry" ]]; then
-              local dir="${entry%/desc}"
-              tar -xzf "$db" -O "$dir/desc" 2>/dev/null | grep -A1 '^%VERSION%$' | tail -n1
+              tar -xzf "$db" -O "${entry}desc" 2>/dev/null | grep -A1 '^%VERSION%$' | tail -n1
             fi
           }
           
           LINUX_VERSION=$(get_kernel_version "$CORE_DB" "linux")
+          LTS_VERSION=$(get_kernel_version "$CORE_DB" "linux-lts")
           HARDENED_VERSION=$(get_kernel_version "$EXTRA_DB" "linux-hardened")
-          LTS_VERSION=$(get_kernel_version "$EXTRA_DB" "linux-lts")
           ZEN_VERSION=$(get_kernel_version "$EXTRA_DB" "linux-zen")
           
           echo "linux: $LINUX_VERSION"
-          echo "linux-hardened: $HARDENED_VERSION"
           echo "linux-lts: $LTS_VERSION"
+          echo "linux-hardened: $HARDENED_VERSION"
           echo "linux-zen: $ZEN_VERSION"
           
           echo "linux_version=$LINUX_VERSION" >> $GITHUB_OUTPUT
-          echo "linux_hardened_version=$HARDENED_VERSION" >> $GITHUB_OUTPUT
           echo "linux_lts_version=$LTS_VERSION" >> $GITHUB_OUTPUT
+          echo "linux_hardened_version=$HARDENED_VERSION" >> $GITHUB_OUTPUT
           echo "linux_zen_version=$ZEN_VERSION" >> $GITHUB_OUTPUT
           
           echo "::endgroup::"
