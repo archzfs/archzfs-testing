@@ -39,7 +39,11 @@ jobs:
           get_kernel_version() {
             local db=$1
             local kernel=$2
-            tar -xzf "$db" -O "${kernel}/desc" 2>/dev/null | grep -A1 '^%VERSION%$' | tail -n1
+            local entry=$(tar -tzf "$db" 2>/dev/null | grep "^${kernel}-[0-9]" | head -n1)
+            if [[ -n "$entry" ]]; then
+              local dir="${entry%/desc}"
+              tar -xzf "$db" -O "$dir/desc" 2>/dev/null | grep -A1 '^%VERSION%$' | tail -n1
+            fi
           }
           
           LINUX_VERSION=$(get_kernel_version "$CORE_DB" "linux")
@@ -72,7 +76,7 @@ jobs:
               .assets[]?
               | select(.name | test("^'"$prefix"'-[0-9].*\\.pkg\\.tar\\.zst$")) 
               | .name 
-              | capture("^'"$prefix"'-[0-9]+_[^_]+_(?<kver>.*)-[^-]+-[^-]+\\.pkg").kver
+              | capture("^'"$prefix"'-[0-9.]+_(?<kver>[^-+]+)-[0-9]+\\.pkg").kver
               ' 2>/dev/null || echo ""
           }
           
