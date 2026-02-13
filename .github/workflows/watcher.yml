@@ -74,9 +74,9 @@ jobs:
             local prefix=$1
             gh release view --repo ${{ github.repository }} --json assets --jq '
               .assets[]?
-              | select(.name | test("^'"$prefix"'-[0-9].*\\.pkg\\.tar\\.zst$")) 
-              | .name 
-              | capture("^'"$prefix"'-[0-9.]+_(?<kver>[^-+]+)-[0-9]+\\.pkg").kver
+              | select(.name | test("^'"$prefix"'-[0-9].*\\.pkg\\.tar\\.zst$"))
+              | .name
+              | capture("^'"$prefix"'-[0-9.]+_(?<kver>[^-+]+)-[0-9]+.*\\.pkg").kver
               ' 2>/dev/null || echo ""
           }
           
