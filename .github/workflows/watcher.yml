@@ -13,51 +13,146 @@ jobs:
   check-version:
     runs-on: ubuntu-latest
     steps:
-      - name: Check For Unreleased Linux Kernel
-        id: check
+      - name: Checkout code
+        uses: actions/checkout@v6.0.2
+
+      - name: Read Mirror URL
+        id: get_mirror
+        run: |
+          MIRROR=$(cat mirror-url | tr -d '\n')
+          echo "MIRROR_URL=$MIRROR" >> $GITHUB_ENV
+
+      - name: Fetch Upstream Kernel Versions
+        id: fetch
+        run: |
+          echo "::group::Fetch Upstream Kernel Versions"
+          
+          TMPDIR=$(mktemp -d)
+          trap "rm -rf $TMPDIR" EXIT
+          
+          CORE_DB="${TMPDIR}/core.db.tar.gz"
+          EXTRA_DB="${TMPDIR}/extra.db.tar.gz"
+          
+          curl -sL "${MIRROR_URL}/core/os/x86_64/core.db.tar.gz" -o "$CORE_DB"
+          curl -sL "${MIRROR_URL}/extra/os/x86_64/extra.db.tar.gz" -o "$EXTRA_DB"
+          
+          get_kernel_version() {
+            local db=$1
+            local kernel=$2
+            tar -xzf "$db" -O "${kernel}/desc" 2>/dev/null | grep -A1 '^%VERSION%$' | tail -n1
+          }
+          
+          LINUX_VERSION=$(get_kernel_version "$CORE_DB" "linux")
+          HARDENED_VERSION=$(get_kernel_version "$EXTRA_DB" "linux-hardened")
+          LTS_VERSION=$(get_kernel_version "$EXTRA_DB" "linux-lts")
+          ZEN_VERSION=$(get_kernel_version "$EXTRA_DB" "linux-zen")
+          
+          echo "linux: $LINUX_VERSION"
+          echo "linux-hardened: $HARDENED_VERSION"
+          echo "linux-lts: $LTS_VERSION"
+          echo "linux-zen: $ZEN_VERSION"
+          
+          echo "linux_version=$LINUX_VERSION" >> $GITHUB_OUTPUT
+          echo "linux_hardened_version=$HARDENED_VERSION" >> $GITHUB_OUTPUT
+          echo "linux_lts_version=$LTS_VERSION" >> $GITHUB_OUTPUT
+          echo "linux_zen_version=$ZEN_VERSION" >> $GITHUB_OUTPUT
+          
+          echo "::endgroup::"
+
+      - name: Get Current Built Versions
+        id: built
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # 1. Get Upstream Arch Linux Kernel Version
-          echo "::group::Fetch Upstream Arch Linux Kernel Version"
-          ARCH_JSON=$(curl -s "https://archlinux.org/packages/core/x86_64/linux/json/")
-          UPSTREAM_VERSION=$(echo "$ARCH_JSON" | jq -r '.pkgver + "." + .pkgrel')
+          echo "::group::Get Current Built Versions"
           
-          echo "Found Upstream Arch Kernel: $UPSTREAM_VERSION"
+          get_built_version() {
+            local prefix=$1
+            gh release view --repo ${{ github.repository }} --json assets --jq '
+              .assets[]?
+              | select(.name | test("^'"$prefix"'-[0-9].*\\.pkg\\.tar\\.zst$")) 
+              | .name 
+              | capture("^'"$prefix"'-[0-9]+_[^_]+_(?<kver>.*)-[^-]+-[^-]+\\.pkg").kver
+              ' 2>/dev/null || echo ""
+          }
+          
+          BUILT_LINUX=$(get_built_version "zfs-linux")
+          BUILT_HARDENED=$(get_built_version "zfs-linux-hardened")
+          BUILT_LTS=$(get_built_version "zfs-linux-lts")
+          BUILT_ZEN=$(get_built_version "zfs-linux-zen")
+          
+          echo "zfs-linux: $BUILT_LINUX"
+          echo "zfs-linux-hardened: $BUILT_HARDENED"
+          echo "zfs-linux-lts: $BUILT_LTS"
+          echo "zfs-linux-zen: $BUILT_ZEN"
+          
+          echo "built_linux=$BUILT_LINUX" >> $GITHUB_OUTPUT
+          echo "built_hardened=$BUILT_HARDENED" >> $GITHUB_OUTPUT
+          echo "built_lts=$BUILT_LTS" >> $GITHUB_OUTPUT
+          echo "built_zen=$BUILT_ZEN" >> $GITHUB_OUTPUT
+          
           echo "::endgroup::"
 
-          # 2. Get kernel version currently built in the repo
-          echo "::group::Check Current Built Version"
-          # `|| true` is included to handle no releases gracefully (e.g. forks)
-          BUILT_VERSION=$(gh release view --repo ${{ github.repository }} --json assets --jq '
-            .assets[]?
-            | select(.name | test("^zfs-linux-[0-9].*\\.pkg\\.tar\\.zst$")) 
-            | .name 
-            | capture("^zfs-linux-[^_]+_(?<kver>.*)-[^-]+-[^-]+\\.pkg").kver
-            ' || true)
-
-          echo "Existing Build found: $BUILT_VERSION"
-          echo "::endgroup::"
-
-          # 3. Is UPSTREAM_VERSION the BUILT_VERSION
+      - name: Compare Versions
+        id: compare
+        run: |
           echo "::group::Version Comparison"
-          if [[ "$BUILT_VERSION" == "$UPSTREAM_VERSION" ]]; then
-            echo "Version $UPSTREAM_VERSION already exists. No build needed."
-            echo "trigger=false" >> $GITHUB_OUTPUT
-          else
-            echo "New kernel detected ($UPSTREAM_VERSION). Triggering build..."
-            echo "trigger=true" >> $GITHUB_OUTPUT
-            echo "kernel_version=$UPSTREAM_VERSION" >> $GITHUB_OUTPUT
+          
+          UPSTREAM_LINUX="${{ steps.fetch.outputs.linux_version }}"
+          UPSTREAM_HARDENED="${{ steps.fetch.outputs.linux_hardened_version }}"
+          UPSTREAM_LTS="${{ steps.fetch.outputs.linux_lts_version }}"
+          UPSTREAM_ZEN="${{ steps.fetch.outputs.linux_zen_version }}"
+          
+          BUILT_LINUX="${{ steps.built.outputs.built_linux }}"
+          BUILT_HARDENED="${{ steps.built.outputs.built_hardened }}"
+          BUILT_LTS="${{ steps.built.outputs.built_lts }}"
+          BUILT_ZEN="${{ steps.built.outputs.built_zen }}"
+          
+          TRIGGER=false
+          UPDATES=""
+          
+          if [[ "$BUILT_LINUX" != "$UPSTREAM_LINUX" ]] && [[ -n "$UPSTREAM_LINUX" ]]; then
+            echo "linux: $BUILT_LINUX -> $UPSTREAM_LINUX"
+            TRIGGER=true
+            UPDATES="${UPDATES}linux:$UPSTREAM_LINUX "
           fi
+          
+          if [[ "$BUILT_HARDENED" != "$UPSTREAM_HARDENED" ]] && [[ -n "$UPSTREAM_HARDENED" ]]; then
+            echo "linux-hardened: $BUILT_HARDENED -> $UPSTREAM_HARDENED"
+            TRIGGER=true
+            UPDATES="${UPDATES}hardened:$UPSTREAM_HARDENED "
+          fi
+          
+          if [[ "$BUILT_LTS" != "$UPSTREAM_LTS" ]] && [[ -n "$UPSTREAM_LTS" ]]; then
+            echo "linux-lts: $BUILT_LTS -> $UPSTREAM_LTS"
+            TRIGGER=true
+            UPDATES="${UPDATES}lts:$UPSTREAM_LTS "
+          fi
+          
+          if [[ "$BUILT_ZEN" != "$UPSTREAM_ZEN" ]] && [[ -n "$UPSTREAM_ZEN" ]]; then
+            echo "linux-zen: $BUILT_ZEN -> $UPSTREAM_ZEN"
+            TRIGGER=true
+            UPDATES="${UPDATES}zen:$UPSTREAM_ZEN "
+          fi
+          
+          echo "trigger=$TRIGGER" >> $GITHUB_OUTPUT
+          echo "updates=$UPDATES" >> $GITHUB_OUTPUT
+          
+          if [[ "$TRIGGER" == "true" ]]; then
+            echo "Kernel updates detected: $UPDATES"
+          else
+            echo "All kernels up to date."
+          fi
+          
           echo "::endgroup::"
 
       - name: Trigger Release Workflow
-        if: steps.check.outputs.trigger == 'true'
+        if: steps.compare.outputs.trigger == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          echo "Triggering release workflow..."
           gh workflow run release.yml \
             --repo ${{ github.repository }} \
             --ref master \
-            -f kernel_version="${{ steps.check.outputs.kernel_version }}"
-          
+            -f kernel_version="${{ steps.compare.outputs.updates }}"
