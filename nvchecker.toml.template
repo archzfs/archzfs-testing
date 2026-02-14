@@ -1,0 +1,24 @@
+[__config__]
+oldver = "oldver.json"
+newver = "newver.json"
+
+[linux]
+source = "regex"
+url = "MIRROR_URL/archlinux/core/os/x86_64/"
+regex = 'linux-(\d+\.\d+\.\d+-\d+)-x86_64\.pkg\.tar\.zst'
+exclude_regex = 'linux-(lts|hardened|zen|headers)'
+
+[linux-lts]
+source = "regex"
+url = "MIRROR_URL/archlinux/core/os/x86_64/"
+regex = 'linux-lts-(\d+\.\d+\.\d+-\d+)-x86_64\.pkg\.tar\.zst'
+
+[linux-hardened]
+source = "regex"
+url = "MIRROR_URL/archlinux/extra/os/x86_64/"
+regex = 'linux-hardened-(\d+\.\d+\.\d+-\d+)-x86_64\.pkg\.tar\.zst'
+
+[linux-zen]
+source = "regex"
+url = "MIRROR_URL/archlinux/extra/os/x86_64/"
+regex = 'linux-zen-(\d+\.\d+\.\d+-\d+)-x86_64\.pkg\.tar\.zst'
