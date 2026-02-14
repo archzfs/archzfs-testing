@@ -40,27 +40,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view --repo ${{ github.repository }} --json assets --jq '.assets[].name' > assets.json
+          gh release view --repo ${{ github.repository }} --json assets --jq '.assets[].name' > assets.txt
           
-          # Extract versions and convert format: 6.12.70.1 into 6.12.70-1
-          normalize_version() {
-            echo "$1" | head -n1 | sed 's/\.\([0-9]*\)$/-\1/'
+          get_version() {
+            grep "$1" assets.txt | head -n1 | sed -n 's/.*_\([^-]*\)-.*/\1/p' | sed 's/\.\([0-9]*\)$/-\1/'
           }
-          
-          LTS_VER=$(grep 'zfs-linux-lts' assets.json | grep -oP '(?<=_)\d+\.\d+\.\d+\.\d+(?=-)' || echo '0.0.0-0')
-          LINUX_VER=$(grep 'zfs-linux-' assets.json | grep -v 'lts\|hardened\|zen' | grep -oP '(?<=_)\d+\.\d+\.\d+\.\d+(?=-)' || echo '0.0.0-0')
-          HARDENED_VER=$(grep 'zfs-linux-hardened' assets.json | grep -oP '(?<=_)\d+\.\d+\.\d+\.\d+(?=-)' || echo '0.0.0-0')
-          ZEN_VER=$(grep 'zfs-linux-zen' assets.json | grep -oP '(?<=_)\d+\.\d+\.\d+\.\d+(?=-)' || echo '0.0.0-0')
-          
+
+          LINUX_VER=$(get_version 'zfs-linux' || echo '0.0.0-0')
+          LTS_VER=$(get_version 'zfs-linux-lts' || echo '0.0.0-0')
+          HARDENED_VER=$(get_version 'zfs-linux-hardened' || echo '0.0.0-0')
+          ZEN_VER=$(get_version 'zfs-linux-zen' || echo '0.0.0-0')
+
           cat > oldver.json <<EOF
           {
-            "linux-lts": "$(normalize_version "$LTS_VER")",
-            "linux": "$(normalize_version "$LINUX_VER")",
-            "linux-hardened": "$(normalize_version "$HARDENED_VER")",
-            "linux-zen": "$(normalize_version "$ZEN_VER")"
+            "linux": "$LINUX_VER",
+            "linux-lts": "$LTS_VER",
+            "linux-hardened": "$HARDENED_VER",
+            "linux-zen": "$ZEN_VER"
           }
           EOF
-          
+
           echo "Generated oldver.json:"
           cat oldver.json
 
