@@ -24,17 +24,12 @@ jobs:
       - name: Install nvchecker
         run: pip install nvchecker
 
-      - name: Read Mirror URL
-        id: get_mirror
+      - name: Download core.db and extra.db from designated mirror
+        id: get_mirror_db
         run: |
           MIRROR=$(cat mirror-url | tr -d '\n')
-          echo "MIRROR_URL=$MIRROR" >> $GITHUB_ENV
-
-      - name: Generate nvchecker config
-        run: |
-          sed "s|MIRROR_URL|$MIRROR_URL|g" nvchecker.toml.template > nvchecker.toml
-          echo "Generated nvchecker.toml with mirror: $MIRROR"
-          cat nvchecker.toml
+          curl -O $MIRROR/archlinux/core/os/x86_64/core.db
+          curl -O $MIRROR/archlinux/extra/os/x86_64/extra.db
 
       - name: Generate oldver.json from current GitHub release
         env:
@@ -67,8 +62,14 @@ jobs:
         id: nvcheck
         run: |
           nvchecker -c nvchecker.toml
-          nvcmp -c nvchecker.toml || echo "trigger=true" >> $GITHUB_OUTPUT
+          UPDATES=$(nvcmp -c nvchecker.toml | tr '\n' ' ')
           cat newver.json
+          echo $UPDATES
+
+          if [ -n "$UPDATES" ]; then
+            echo "trigger=true" >> $GITHUB_OUTPUT
+            echo "updates=$UPDATES" >> $GITHUB_OUTPUT
+          fi
 
       - name: Trigger Release Workflow
         if: steps.compare.outputs.trigger == 'true'
@@ -79,5 +80,4 @@ jobs:
           gh workflow run release.yml \
             --repo ${{ github.repository }} \
             --ref master \
-            f kernel_version="TEST"
-            #-f kernel_version="${{ steps.compare.outputs.updates }}"
+            -f kernel_version="${{ steps.compare.outputs.updates }}"
