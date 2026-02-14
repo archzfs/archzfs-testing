@@ -35,7 +35,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view --repo ${{ github.repository }} --json assets --jq '.assets[].name' > assets.txt
+          touch assets.txt
+          (gh release view --repo ${{ github.repository }} --json assets --jq '.assets[].name' | echo '') > assets.txt
           
           get_version() {
             grep "$1" assets.txt | head -n1 | sed -n 's/.*_\([^-]*\)-.*/\1/p' | sed 's/\.\([0-9]*\)$/-\1/'
