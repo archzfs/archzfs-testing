@@ -5,7 +5,7 @@ newver = "newver.json"
 [linux]
 source = "regex"
 url = "MIRROR_URL/archlinux/core/os/x86_64/"
-regex = 'linux-(\d+\.\d+\.\d+-\d+)-x86_64\.pkg\.tar\.zst'
+regex = '[^-]linux-(\d+\.\d+\.\d+-\d+)-x86_64\.pkg\.tar\.zst'
 exclude_regex = 'linux-(lts|hardened|zen|headers)'
 
 [linux-lts]
