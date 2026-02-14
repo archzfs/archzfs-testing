@@ -16,138 +16,60 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6.0.2
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install nvchecker
+        run: pip install nvchecker
+
       - name: Read Mirror URL
         id: get_mirror
         run: |
           MIRROR=$(cat mirror-url | tr -d '\n')
           echo "MIRROR_URL=$MIRROR" >> $GITHUB_ENV
 
-      - name: Fetch Upstream Kernel Versions
-        id: fetch
+      - name: Generate nvchecker config
         run: |
-          echo "::group::Fetch Upstream Kernel Versions"
-          
-          TMPDIR=$(mktemp -d)
-          trap "rm -rf $TMPDIR" EXIT
-          
-          CORE_DB="${TMPDIR}/core.db.tar.gz"
-          EXTRA_DB="${TMPDIR}/extra.db.tar.gz"
-          
-          curl -sL "${MIRROR_URL}/core/os/x86_64/core.db.tar.gz" -o "$CORE_DB"
-          curl -sL "${MIRROR_URL}/extra/os/x86_64/extra.db.tar.gz" -o "$EXTRA_DB"
-          
-          get_kernel_version() {
-            local db=$1
-            local kernel=$2
-            local entry=$(tar -tzf "$db" 2>/dev/null | grep "^${kernel}-[0-9].*/$" | head -n1)
-            if [[ -n "$entry" ]]; then
-              tar -xzf "$db" -O "${entry}desc" 2>/dev/null | grep -A1 '^%VERSION%$' | tail -n1
-            fi
-          }
-          
-          LINUX_VERSION=$(get_kernel_version "$CORE_DB" "linux")
-          LTS_VERSION=$(get_kernel_version "$CORE_DB" "linux-lts")
-          HARDENED_VERSION=$(get_kernel_version "$EXTRA_DB" "linux-hardened")
-          ZEN_VERSION=$(get_kernel_version "$EXTRA_DB" "linux-zen")
-          
-          echo "linux: $LINUX_VERSION"
-          echo "linux-lts: $LTS_VERSION"
-          echo "linux-hardened: $HARDENED_VERSION"
-          echo "linux-zen: $ZEN_VERSION"
-          
-          echo "linux_version=$LINUX_VERSION" >> $GITHUB_OUTPUT
-          echo "linux_lts_version=$LTS_VERSION" >> $GITHUB_OUTPUT
-          echo "linux_hardened_version=$HARDENED_VERSION" >> $GITHUB_OUTPUT
-          echo "linux_zen_version=$ZEN_VERSION" >> $GITHUB_OUTPUT
-          
-          echo "::endgroup::"
+          sed "s|MIRROR_URL|$MIRROR_URL|g" nvchecker.toml.template > nvchecker.toml
+          echo "Generated nvchecker.toml with mirror: $MIRROR"
+          cat nvchecker.toml
 
-      - name: Get Current Built Versions
-        id: built
+      - name: Generate oldver.json from current GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "::group::Get Current Built Versions"
+          gh release view --repo ${{ github.repository }} --json assets --jq '.assets[].name' > assets.json
           
-          get_built_version() {
-            local prefix=$1
-            gh release view --repo ${{ github.repository }} --json assets --jq '
-              .assets[]?
-              | select(.name | test("^'"$prefix"'-[0-9].*\\.pkg\\.tar\\.zst$"))
-              | .name
-              | capture("^'"$prefix"'-[0-9.]+_(?<kver>[^-+]+)-[0-9]+.*\\.pkg").kver
-              ' 2>/dev/null || echo ""
+          # Extract versions and convert format: 6.12.70.1 into 6.12.70-1
+          normalize_version() {
+            echo "$1" | head -n1 | sed 's/\.\([0-9]*\)$/-\1/'
           }
           
-          BUILT_LINUX=$(get_built_version "zfs-linux")
-          BUILT_HARDENED=$(get_built_version "zfs-linux-hardened")
-          BUILT_LTS=$(get_built_version "zfs-linux-lts")
-          BUILT_ZEN=$(get_built_version "zfs-linux-zen")
+          LTS_VER=$(grep 'zfs-linux-lts' assets.json | grep -oP '(?<=_)\d+\.\d+\.\d+\.\d+(?=-)' || echo '0.0.0-0')
+          LINUX_VER=$(grep 'zfs-linux-' assets.json | grep -v 'lts\|hardened\|zen' | grep -oP '(?<=_)\d+\.\d+\.\d+\.\d+(?=-)' || echo '0.0.0-0')
+          HARDENED_VER=$(grep 'zfs-linux-hardened' assets.json | grep -oP '(?<=_)\d+\.\d+\.\d+\.\d+(?=-)' || echo '0.0.0-0')
+          ZEN_VER=$(grep 'zfs-linux-zen' assets.json | grep -oP '(?<=_)\d+\.\d+\.\d+\.\d+(?=-)' || echo '0.0.0-0')
           
-          echo "zfs-linux: $BUILT_LINUX"
-          echo "zfs-linux-hardened: $BUILT_HARDENED"
-          echo "zfs-linux-lts: $BUILT_LTS"
-          echo "zfs-linux-zen: $BUILT_ZEN"
+          cat > oldver.json <<EOF
+          {
+            "linux-lts": "$(normalize_version "$LTS_VER")",
+            "linux": "$(normalize_version "$LINUX_VER")",
+            "linux-hardened": "$(normalize_version "$HARDENED_VER")",
+            "linux-zen": "$(normalize_version "$ZEN_VER")"
+          }
+          EOF
           
-          echo "built_linux=$BUILT_LINUX" >> $GITHUB_OUTPUT
-          echo "built_hardened=$BUILT_HARDENED" >> $GITHUB_OUTPUT
-          echo "built_lts=$BUILT_LTS" >> $GITHUB_OUTPUT
-          echo "built_zen=$BUILT_ZEN" >> $GITHUB_OUTPUT
-          
-          echo "::endgroup::"
+          echo "Generated oldver.json:"
+          cat oldver.json
 
-      - name: Compare Versions
-        id: compare
+      - name: Check for updates
+        id: nvcheck
         run: |
-          echo "::group::Version Comparison"
-          
-          UPSTREAM_LINUX="${{ steps.fetch.outputs.linux_version }}"
-          UPSTREAM_HARDENED="${{ steps.fetch.outputs.linux_hardened_version }}"
-          UPSTREAM_LTS="${{ steps.fetch.outputs.linux_lts_version }}"
-          UPSTREAM_ZEN="${{ steps.fetch.outputs.linux_zen_version }}"
-          
-          BUILT_LINUX="${{ steps.built.outputs.built_linux }}"
-          BUILT_HARDENED="${{ steps.built.outputs.built_hardened }}"
-          BUILT_LTS="${{ steps.built.outputs.built_lts }}"
-          BUILT_ZEN="${{ steps.built.outputs.built_zen }}"
-          
-          TRIGGER=false
-          UPDATES=""
-          
-          if [[ "$BUILT_LINUX" != "$UPSTREAM_LINUX" ]] && [[ -n "$UPSTREAM_LINUX" ]]; then
-            echo "linux: $BUILT_LINUX -> $UPSTREAM_LINUX"
-            TRIGGER=true
-            UPDATES="${UPDATES}linux:$UPSTREAM_LINUX "
-          fi
-          
-          if [[ "$BUILT_HARDENED" != "$UPSTREAM_HARDENED" ]] && [[ -n "$UPSTREAM_HARDENED" ]]; then
-            echo "linux-hardened: $BUILT_HARDENED -> $UPSTREAM_HARDENED"
-            TRIGGER=true
-            UPDATES="${UPDATES}hardened:$UPSTREAM_HARDENED "
-          fi
-          
-          if [[ "$BUILT_LTS" != "$UPSTREAM_LTS" ]] && [[ -n "$UPSTREAM_LTS" ]]; then
-            echo "linux-lts: $BUILT_LTS -> $UPSTREAM_LTS"
-            TRIGGER=true
-            UPDATES="${UPDATES}lts:$UPSTREAM_LTS "
-          fi
-          
-          if [[ "$BUILT_ZEN" != "$UPSTREAM_ZEN" ]] && [[ -n "$UPSTREAM_ZEN" ]]; then
-            echo "linux-zen: $BUILT_ZEN -> $UPSTREAM_ZEN"
-            TRIGGER=true
-            UPDATES="${UPDATES}zen:$UPSTREAM_ZEN "
-          fi
-          
-          echo "trigger=$TRIGGER" >> $GITHUB_OUTPUT
-          echo "updates=$UPDATES" >> $GITHUB_OUTPUT
-          
-          if [[ "$TRIGGER" == "true" ]]; then
-            echo "Kernel updates detected: $UPDATES"
-          else
-            echo "All kernels up to date."
-          fi
-          
-          echo "::endgroup::"
+          nvchecker -c nvchecker.toml
+          nvcmp -c nvchecker.toml || echo "trigger=true" >> $GITHUB_OUTPUT
+          cat newver.json
 
       - name: Trigger Release Workflow
         if: steps.compare.outputs.trigger == 'true'
@@ -158,4 +80,5 @@ jobs:
           gh workflow run release.yml \
             --repo ${{ github.repository }} \
             --ref master \
-            -f kernel_version="${{ steps.compare.outputs.updates }}"
+            f kernel_version="TEST"
+            #-f kernel_version="${{ steps.compare.outputs.updates }}"
