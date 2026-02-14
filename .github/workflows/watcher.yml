@@ -73,7 +73,7 @@ jobs:
           fi
 
       - name: Trigger Release Workflow
-        if: steps.compare.outputs.trigger == 'true'
+        if: steps.nvcheck.outputs.trigger == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -81,4 +81,4 @@ jobs:
           gh workflow run release.yml \
             --repo ${{ github.repository }} \
             --ref master \
-            -f kernel_version="${{ steps.compare.outputs.updates }}"
+            -f kernel_version="${{ steps.nvcheck.outputs.updates }}"
