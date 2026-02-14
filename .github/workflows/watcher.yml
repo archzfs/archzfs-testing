@@ -37,7 +37,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # Workaround for repos with no assets (releases)
-          (gh release view --repo ${{ github.repository }} --json assets --jq '.assets[].name' | echo '') > assets.txt
+          (gh release view --repo ${{ github.repository }} --json assets --jq '.assets[].name' || echo '') > assets.txt
           
           get_version() {
             grep "$1" assets.txt | head -n1 | sed -n 's/.*_\([^-]*\)-.*/\1/p' | sed 's/\.\([0-9]*\)$/-\1/'
@@ -58,6 +58,7 @@ jobs:
           EOF
 
           echo "Generated oldver.json:"
+          cat oldver.json
 
       - name: Check for updates
         id: nvcheck
