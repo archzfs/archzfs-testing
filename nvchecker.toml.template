@@ -16,9 +16,9 @@ regex = 'linux-lts-(\d+\.\d+\.\d+-\d+)-x86_64\.pkg\.tar\.zst'
 [linux-hardened]
 source = "regex"
 url = "MIRROR_URL/archlinux/extra/os/x86_64/"
-regex = 'linux-hardened-(\d+\.\d+\.\d+-\d+)-x86_64\.pkg\.tar\.zst'
+regex = 'linux-hardened-(\d+\.\d+\.\d+\.hardened\d+-\d+)-x86_64\.pkg\.tar\.zst'
 
 [linux-zen]
 source = "regex"
 url = "MIRROR_URL/archlinux/extra/os/x86_64/"
-regex = 'linux-zen-(\d+\.\d+\.\d+-\d+)-x86_64\.pkg\.tar\.zst'
+regex = 'linux-zen-(\d+\.\d+\.\d+\.zen\d+-\d+)-x86_64\.pkg\.tar\.zst'
