@@ -27,8 +27,6 @@ on:
       - '!.github/workflows/watcher.yml'
       - 'build-container/**'
       - 'packages/**'
-  schedule:
-    - cron: "4 2 * * *"
 
 name: Release
 run-name: ${{ inputs.kernel_version || 'Manual/Cron' }} release
