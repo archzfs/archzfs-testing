@@ -1,4 +1,4 @@
-name: Watch for Arch Kernel Updates
+name: Watch for Upstream Updates
 permissions:
   contents: read
   actions: write
