@@ -1,11 +1,12 @@
-name: Update OpenZFS Conf
-
 on:
   workflow_dispatch:
     inputs:
       version:
         description: 'New OpenZFS version'
         required: true
+
+name: Update OpenZFS
+run-name: Create PR to update OpenZFS to ${{ inputs.version }}
 
 permissions:
   contents: write
