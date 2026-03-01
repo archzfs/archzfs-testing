@@ -18,23 +18,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6.0.2
 
-      - name: Download release and calculate hash
-        id: calc_hash
+      - name: Get release hash from GitHub
+        id: get_hash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
         run: |
-          VERSION="${{ inputs.version }}"
-          TARBALL_URL="https://github.com/openzfs/zfs/releases/download/zfs-${VERSION}/zfs-${VERSION}.tar.gz"
-          
-          echo "Downloading $TARBALL_URL..."
-          curl -sL "$TARBALL_URL" -o zfs.tar.gz
-          
-          HASH=$(sha256sum zfs.tar.gz | awk '{print $1}')
-          echo "New hash: $HASH"
-          echo "hash=$HASH" >> $GITHUB_OUTPUT
+          FILENAME="zfs-${VERSION}.tar.gz"
+
+          DIGEST=$(gh api "repos/openzfs/zfs/releases/tags/zfs-${VERSION}" \
+            --jq ".assets[] | select(.name == \"$FILENAME\") | .digest")
+
+          HASH=${DIGEST#sha256:}
+          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
 
       - name: Update conf.sh
+        env:
+          VERSION: ${{ inputs.version }}
+          HASH: ${{ steps.get_hash.outputs.hash }}
         run: |
-          VERSION="${{ inputs.version }}"
-          HASH="${{ steps.calc_hash.outputs.hash }}"
           
           # Replace version and hash in conf.sh
           sed -i "s/^openzfs_version=\".*\"/openzfs_version=\"${VERSION}\"/" conf.sh
@@ -47,7 +49,7 @@ jobs:
           commit-message: "chore: update OpenZFS to ${{ inputs.version }}"
           title: "Update OpenZFS to ${{ inputs.version }}"
           body: |
-            Automated PR triggered by nvchecker. Updates `openzfs_version` to **${{ inputs.version }}** and computes the new `zfs_src_hash`.
+            Automated PR triggered by nvchecker. Updates `openzfs_version` to **${{ inputs.version }}**.
           branch: "update-openzfs-${{ inputs.version }}"
           base: master
 

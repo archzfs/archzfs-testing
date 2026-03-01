@@ -95,7 +95,7 @@ jobs:
             fi
           fi
 
-      - name: Trigger Release Workflow
+      - name: Trigger Kernel Release Workflow
         if: >
           steps.nvcheck.outputs.build_linux == 'true' || 
           steps.nvcheck.outputs.build_linux_lts == 'true' || 
@@ -117,8 +117,22 @@ jobs:
         if: steps.nvcheck.outputs.update_openzfs == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          NEW_ZFS_VERSION: ${{ steps.nvcheck.outputs.openzfs_version }}
         run: |
-          gh workflow run update-zfs.yml \
+          # Check if an open PR already exists for this specific branch
+          PR_EXISTS=$(gh pr list \
             --repo ${{ github.repository }} \
-            --ref master \
-            -f version="${{ steps.nvcheck.outputs.openzfs_version }}"
+            --state open \
+            --head "update-openzfs-$NEW_ZFS_VERSION" \
+            --json number \
+            --jq 'length')
+
+          if [ "$PR_EXISTS" -gt "0" ]; then
+            echo "An open PR for OpenZFS $NEW_ZFS_VERSION already exists. Skipping workflow trigger."
+          else
+            echo "No existing PR found. Triggering update-zfs.yml for version $NEW_ZFS_VERSION."
+            gh workflow run update-zfs.yml \
+              --repo ${{ github.repository }} \
+              --ref master \
+              -f version="$NEW_ZFS_VERSION"
+          fi
