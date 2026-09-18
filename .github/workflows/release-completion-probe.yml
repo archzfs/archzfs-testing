@@ -1,0 +1,17 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  complete:
+    name: Emit staging Release completion
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Complete without publishing
+        run: |
+          echo "Staging-only completion probe for archzfs/archzfs PR #648"
